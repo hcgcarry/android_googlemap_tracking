@@ -1,0 +1,3 @@
+rootProject.name='googlemap'
+include ':app'
+include ':app', ':easyclass'
