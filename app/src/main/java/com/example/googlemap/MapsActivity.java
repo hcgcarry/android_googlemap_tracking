@@ -1,116 +1,141 @@
 package com.example.googlemap;
-import com.google.android.gms.maps.UiSettings;
-import androidx.fragment.app.FragmentActivity;
 
-import android.app.Activity;
-import android.graphics.Color;
-import android.os.AsyncTask;
-import android.os.Bundle;
-import android.util.Log;
+//import android.support.annotation.NonNull;
+//import android.support.annotation.Nullable;
+        import android.graphics.Color;
+        import android.os.Bundle;
+        import android.util.Log;
 
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.CameraPosition;
-import com.google.android.gms.maps.model.CircleOptions;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
+        import androidx.fragment.app.FragmentActivity;
+
+        import com.google.android.gms.maps.CameraUpdateFactory;
+        import com.google.android.gms.maps.GoogleMap;
+        import com.google.android.gms.maps.OnMapReadyCallback;
+        import com.google.android.gms.maps.SupportMapFragment;
+        import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+        import com.google.android.gms.maps.model.CameraPosition;
+        import com.google.android.gms.maps.model.CircleOptions;
+        import com.google.android.gms.maps.model.LatLng;
+        import com.google.android.gms.maps.model.Marker;
+        import com.google.android.gms.maps.model.MarkerOptions;
+        import com.google.android.gms.maps.model.Polyline;
+        import com.google.android.gms.maps.model.PolylineOptions;
+        import com.google.firebase.database.ChildEventListener;
+        import com.google.firebase.database.DataSnapshot;
+        import com.google.firebase.database.DatabaseError;
+        import com.google.firebase.database.DatabaseReference;
+        import com.google.firebase.database.FirebaseDatabase;
+        import com.google.firebase.database.ValueEventListener;
+
+        import java.util.ArrayList;
+        import java.util.List;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
     private String TAG="MapsActivityClass";
 
     private GoogleMap mMap;
-    private Location location;
+    LatLng previousLatLng;
+    LatLng currentLatLng;
+    private Polyline polyline1;
+    private List<LatLng> polylinePoints = new ArrayList<>();
+    private Marker mCurrLocationMarker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-            setContentView(R.layout.activity_maps);
-        init();
+        setContentView(R.layout.activity_maps);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        getLocation();
-        activateMap();
-    }
-    private void init(){
-        this.location = new Location();
-        this.location.latitude=22.990825;
-        this.location.latitude=120.219413;
-    }
-    private void getLocation(){
-        this.location.get();
-        //this.location.printLocation(TAG);
-    }
-
-    private void activateMap(){
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
+        //firebaseInsert firebase= new firebaseInsert();
 
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     @Override
     public void onMapReady(GoogleMap googleMap) {
-        //location.printLocation(TAG);
         mMap = googleMap;
-        mMap.setMinZoomPreference(12);
-        mMap.setIndoorEnabled(true);
-        UiSettings uiSettings = mMap.getUiSettings();
-        uiSettings.setIndoorLevelPickerEnabled(false);
-        uiSettings.setMyLocationButtonEnabled(true);
-        uiSettings.setMapToolbarEnabled(false);
-        uiSettings.setCompassEnabled(true);
-        uiSettings.setZoomControlsEnabled(true);
-
-        //LatLng ny = new LatLng(location.latitude, location.longitude);
-        LatLng ny = new LatLng(location.longitude, location.latitude);
-        //LatLng ny = new LatLng(22.990825,120.219413);
-
-        MarkerOptions markerOptions = new MarkerOptions();
-        markerOptions.position(ny);
-        mMap.addMarker(markerOptions);
-
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(ny));
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(20));     // 放大地圖到 16 倍大
-        //moveCameraLoop();
-        //test();
+        // Add a marker  and move the camera
+        polyline1 = mMap.addPolyline(new PolylineOptions().addAll(polylinePoints));
+        fetchLocationUpdates();
     }
 
-    private void test(){
-        GetXMLTask task = new GetXMLTask();
-        task.execute();
-    }
+    private void fetchLocationUpdates() {
+        final FirebaseDatabase database = FirebaseDatabase.getInstance();
+        DatabaseReference ref = database.getReference().child("Location").child("1");
 
-    //@SuppressLint("NewApi")
-    private class GetXMLTask extends AsyncTask<Void, Void, Void> {
-        @Override
-        protected Void doInBackground(Void... urls) {
-            try {
-            } catch (Exception e) {
+        ref.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+
+                Log.i(TAG, "New location updated:" + dataSnapshot.getKey());
+                updateMap(dataSnapshot);
+
             }
-            return null;
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    private void updateMap(DataSnapshot dataSnapshot) {
+        double longitude= 22.990825,latitude = 120.219413;
+
+        /*
+        Iterable<DataSnapshot> data = dataSnapshot.getChildren();
+        for(DataSnapshot d: data){
+            if(d.getKey().equals("latitude")){
+                Log.d(TAG,"getlatitude");
+                latitude =  Double.toString(d.getValue()) ;
+            }else if(d.getKey().equals("longitude")){
+                Log.d(TAG,"getlongitude");
+                longitude = (Double) d.getValue();
+            }
         }
 
-        @Override
-        protected void onPostExecute(Void avoid) {
-            super.onPostExecute(avoid);
-            moveCamera();
-            addCircle();
+         */
+        Location location = dataSnapshot.getValue(Location.class);
+        latitude = Double.parseDouble(location.latitude);
+        longitude = Double.parseDouble( location.longitude);
+
+
+
+        currentLatLng = new LatLng(latitude, longitude);
+        Log.d(TAG,Double.toString(latitude));
+        Log.d(TAG,Double.toString(longitude));
+
+        if(previousLatLng ==null || previousLatLng != currentLatLng){
+            // add marker line
+            if(mMap!=null) {
+                /*
+                previousLatLng  = currentLatLng;
+                polylinePoints.add(currentLatLng);
+                polyline1.setPoints(polylinePoints);
+                Log.w("tag", "Key:" + currentLatLng);
+                if(mCurrLocationMarker!=null){
+                    mCurrLocationMarker.setPosition(currentLatLng);
+                }else{
+                    mCurrLocationMarker = mMap.addMarker(new MarkerOptions()
+                            .position(currentLatLng)
+                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_launcher_foreground))
+                            .title("Delivery"));
+                }
+                */
+                mMap.clear();
+                mMap.moveCamera(CameraUpdateFactory.newLatLng(currentLatLng));
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 20));
+                //addCircle(currentLatLng);
+                //mMap.moveCamera(CameraUpdateFactory.newLatLng(ny));
+                mMap.addMarker(new MarkerOptions().position(currentLatLng).title("CurrentPosition"));
+                //mMap.animateCamera(CameraUpdateFactory.zoomTo(20));     // 放大地圖到 16 倍大
+            }
+
         }
     }
-    private void addCircle(){
-        LatLng ny = new LatLng(location.longitude, location.latitude);
+    private void addCircle(LatLng lat){
+        LatLng ny = lat;
         CircleOptions circleOptions = new CircleOptions();
         circleOptions.center(ny);
         circleOptions.radius(1);
@@ -119,47 +144,5 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         circleOptions.strokeWidth(4);
         mMap.addCircle(circleOptions);
     }
-
-    private void moveCamera() {
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        location.printLocation(TAG);
-            LatLng ny = new LatLng(location.longitude, location.latitude);
-            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition.Builder().target(ny)
-                    .zoom(25).build()));
-            Log.d(TAG, "-----move camera success!!!!!!!!!!!!");
-            /*
-             */
-
-    }
-
-    /*
-    private void moveCameraLoop(){
-        new Thread(new Runnable() {
-
-            @Override
-            public void run() {
-                FragmentActivity.runOnUIThread(new Runnable(){
-                    public void run(){
-                        location.printLocation(TAG);
-                        LatLng ny = new LatLng(location.longitude, location.latitude);
-                        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition.Builder().target(ny)
-                                .zoom(13).build()));
-                        Log.d(TAG,"move camera success");
-                        try {
-                            Thread.sleep(2000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-            }
-        }).start();
-
-    }
-     */
 }
+
